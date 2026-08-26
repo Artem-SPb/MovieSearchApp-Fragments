@@ -37,9 +37,9 @@ android {
         }
     }
 
-    // Включаем генерацию класса BuildConfig
     buildFeatures {
         buildConfig = true
+        viewBinding = true
     }
 
     compileOptions {
@@ -75,4 +75,7 @@ dependencies {
 
     // Конвертер Gson для преобразования JSON-ответа сервера в объекты Kotlin
     implementation("com.squareup.retrofit2:converter-gson:2.9.0")
+
+    // Koin for DI
+    implementation("io.insert-koin:koin-android:3.3.0")
 }

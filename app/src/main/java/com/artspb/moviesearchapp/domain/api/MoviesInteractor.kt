@@ -1,14 +1,17 @@
 package com.artspb.moviesearchapp.domain.api
 
 import com.artspb.moviesearchapp.domain.models.Movie
+import com.artspb.moviesearchapp.domain.models.MovieDetails
 
-// Интерфейс интерактора — это окно, через которое слой UI (Presentation) общается со слоем бизнес-логики (Domain).
-// Так как сетевой запрос выполняется в отдельном потоке, для возврата списка найденных фильмов
-// я использую Callback в виде вложенного интерфейса MoviesConsumer.
 interface MoviesInteractor {
     fun searchMovies(expression: String, consumer: MoviesConsumer)
+    fun getMoviesDetails(movieId: String, consumer: MovieDetailsConsumer)
 
     interface MoviesConsumer {
-        fun consume(foundMovies: List<Movie>)
+        fun consume(foundMovies: List<Movie>?, errorMessage: String?)
+    }
+
+    interface MovieDetailsConsumer {
+        fun consume(movieDetails: MovieDetails?, errorMessage: String?)
     }
 }

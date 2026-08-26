@@ -1,5 +1,6 @@
 package com.artspb.moviesearchapp.data.network
 
+import com.artspb.moviesearchapp.data.dto.MovieDetailsResponse
 import com.artspb.moviesearchapp.data.dto.MoviesSearchResponse
 import retrofit2.Call
 import retrofit2.http.GET
@@ -14,4 +15,10 @@ interface IMDbApi {
         @Query("apikey") apiKey: String,
         @Query("s") expression: String
     ): Call<MoviesSearchResponse>
+
+    @GET("/")
+    fun getMovieDetails(
+        @Query("apikey") apiKey: String,
+        @Query("i") movieId: String
+    ): Call<MovieDetailsResponse>
 }

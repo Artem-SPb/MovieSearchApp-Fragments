@@ -11,7 +11,6 @@ import android.widget.EditText
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
-import androidx.lifecycle.ViewModelProvider
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.artspb.moviesearchapp.R
@@ -20,8 +19,11 @@ import com.artspb.moviesearchapp.ui.inspector.ArchitectureBottomSheetDialog
 import com.artspb.moviesearchapp.ui.inspector.ArchitectureFlowMonitor
 import com.artspb.moviesearchapp.ui.inspector.FlowStep
 import com.artspb.moviesearchapp.ui.inspector.LayerType
-import com.artspb.moviesearchapp.ui.poster.PosterActivity
+import com.artspb.moviesearchapp.ui.poster.DetailsActivity
+import org.koin.androidx.viewmodel.ext.android.viewModel
 
+// В этом классе я переписал логику создания ViewModel, 
+// теперь Koin делает всю работу за нас (by viewModel())!
 class MoviesActivity : AppCompatActivity(), ArchitectureFlowMonitor.FlowStepListener {
 
     private lateinit var searchButton: Button
@@ -41,15 +43,13 @@ class MoviesActivity : AppCompatActivity(), ArchitectureFlowMonitor.FlowStepList
     private val movies = ArrayList<Movie>()
     private val adapter = MoviesAdapter()
 
-    private lateinit var viewModel: MoviesViewModel
+    private val viewModel: MoviesViewModel by viewModel()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
         title = "Поиск фильмов (MVVM)"
-
-        viewModel = ViewModelProvider(this, MoviesViewModel.getFactory())[MoviesViewModel::class.java]
 
         placeholderMessage = findViewById(R.id.placeholderMessage)
         searchButton = findViewById(R.id.searchButton)
@@ -72,16 +72,14 @@ class MoviesActivity : AppCompatActivity(), ArchitectureFlowMonitor.FlowStepList
         adapter.onMovieClick = { movie ->
             ArchitectureFlowMonitor.logStep(
                 layer = LayerType.UI,
-                title = "Клик по карточке фильма",
-                details = "Передача чистой модели Domain в PosterActivity через Intent",
+                title = "Клик по элементу списка",
+                details = "Открываем DetailsActivity",
                 payloadPreview = "Movie(title='${movie.title}', id='${movie.id}')"
             )
 
-            val intent = Intent(this, PosterActivity::class.java).apply {
-                putExtra("EXTRA_TITLE", movie.title)
-                putExtra("EXTRA_IMAGE", movie.image)
-                putExtra("EXTRA_TYPE", movie.resultType)
-                putExtra("EXTRA_YEAR", movie.description)
+            val intent = Intent(this, DetailsActivity::class.java).apply {
+                putExtra("poster", movie.image)
+                putExtra("id", movie.id)
             }
             startActivity(intent)
         }
@@ -99,14 +97,6 @@ class MoviesActivity : AppCompatActivity(), ArchitectureFlowMonitor.FlowStepList
                 if (p0 != null && p0.toString().isNotEmpty()) {
                     ArchitectureFlowMonitor.clearHistory()
                     resetHudPills()
-                    
-                    ArchitectureFlowMonitor.logStep(
-                        layer = LayerType.UI,
-                        title = "Ввод текста в EditText",
-                        details = "UI-слой передает строку запроса во ViewModel для debounce",
-                        payloadPreview = "query = '${p0}'"
-                    )
-                    
                     viewModel.searchDebounce(p0.toString())
                 }
             }
@@ -114,7 +104,7 @@ class MoviesActivity : AppCompatActivity(), ArchitectureFlowMonitor.FlowStepList
             override fun afterTextChanged(p0: Editable?) {}
         })
         
-        searchButton.visibility = View.GONE // Кнопка больше не нужна, так как поиск автоматический (debounce)
+        searchButton.visibility = View.GONE
 
         viewModel.observeState().observe(this) { state ->
             render(state)
@@ -130,13 +120,6 @@ class MoviesActivity : AppCompatActivity(), ArchitectureFlowMonitor.FlowStepList
     }
 
     private fun render(state: MoviesState) {
-        ArchitectureFlowMonitor.logStep(
-            layer = LayerType.UI,
-            title = "MoviesActivity.render()",
-            details = "UI-слой получил новое состояние экрана от LiveData",
-            payloadPreview = "State: ${state::class.java.simpleName}"
-        )
-        
         when (state) {
             is MoviesState.Loading -> {
                 placeholderMessage.visibility = View.VISIBLE
@@ -173,7 +156,7 @@ class MoviesActivity : AppCompatActivity(), ArchitectureFlowMonitor.FlowStepList
     override fun onStepAdded(step: FlowStep) {
         runOnUiThread {
             tvHudStatus.text = "${step.layer.displayName}: ${step.title}"
-            btnOpenFlowLog.text = "📋 Лог (${ArchitectureFlowMonitor.getHistory().size})"
+            btnOpenFlowLog.text = "Лог потока (${ArchitectureFlowMonitor.getHistory().size})"
 
             when (step.layer) {
                 LayerType.UI -> pillUi.setBackgroundColor(Color.parseColor(LayerType.UI.colorHex))
@@ -187,8 +170,8 @@ class MoviesActivity : AppCompatActivity(), ArchitectureFlowMonitor.FlowStepList
 
     override fun onFlowCleared() {
         runOnUiThread {
-            btnOpenFlowLog.text = "📋 Лог (0)"
-            tvHudStatus.text = "Готово к поиску..."
+            btnOpenFlowLog.text = "Лог потока (0)"
+            tvHudStatus.text = "Ожидание ввода..."
             resetHudPills()
         }
     }

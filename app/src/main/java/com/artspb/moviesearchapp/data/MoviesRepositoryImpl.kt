@@ -1,43 +1,63 @@
 package com.artspb.moviesearchapp.data
 
+import com.artspb.moviesearchapp.data.dto.MovieDetailsRequest
+import com.artspb.moviesearchapp.data.dto.MovieDetailsResponse
 import com.artspb.moviesearchapp.data.dto.MoviesSearchRequest
 import com.artspb.moviesearchapp.data.dto.MoviesSearchResponse
 import com.artspb.moviesearchapp.data.network.NetworkClient
 import com.artspb.moviesearchapp.domain.api.MoviesRepository
 import com.artspb.moviesearchapp.domain.models.Movie
-import com.artspb.moviesearchapp.ui.inspector.ArchitectureFlowMonitor
-import com.artspb.moviesearchapp.ui.inspector.LayerType
+import com.artspb.moviesearchapp.domain.models.MovieDetails
+import com.artspb.moviesearchapp.util.Resource
 
-// Реализация интерфейса MoviesRepository.
-// Согласно лекции по Clean Architecture, этот класс должен находиться именно в слое Data (или в пакете data),
-// потому что здесь мы напрямую работаем с DTO-классами (MoviesSearchRequest, MoviesSearchResponse).
-// После получения ответа от NetworkClient мы маппим (преобразуем) сетевые DTO в чистые Domain-модели Movie.
 class MoviesRepositoryImpl(private val networkClient: NetworkClient) : MoviesRepository {
 
-    override fun searchMovies(expression: String): List<Movie> {
-        // Обращаюсь к сетевому клиенту через интерфейс, передавая DTO запроса.
+    override fun searchMovies(expression: String): Resource<List<Movie>> {
         val response = networkClient.doRequest(MoviesSearchRequest(expression))
-        if (response.resultCode == 200 && response is MoviesSearchResponse) {
-            val dtoResponse = response
-            
-            ArchitectureFlowMonitor.logStep(
-                layer = LayerType.MAPPING,
-                title = "Маппинг в MoviesRepositoryImpl",
-                details = "Преобразование сетевых DTO моделей в чистые бизнес-модели Domain (Movie)",
-                payloadPreview = "Mapping: ${dtoResponse.results?.size ?: 0} MovieDto ➔ List<Movie>"
-            )
-
-            // В OMDb API если фильмы найдены, то response == "True" и results != null.
-            // Преобразую MovieDto в чистые бизнес-модели Movie с помощью map {}.
-            if (dtoResponse.response == "True" && dtoResponse.results != null) {
-                return dtoResponse.results.map {
-                    Movie(it.id, it.resultType, it.image, it.title, it.description)
-                }
-            } else {
-                return emptyList()
+        return when (response.resultCode) {
+            -1, 500 -> {
+                Resource.Error("Проверьте подключение к интернету")
             }
-        } else {
-            return emptyList()
+            200 -> {
+                with(response as MoviesSearchResponse) {
+                    Resource.Success((results ?: emptyList()).map {
+                        Movie(it.id, it.resultType, it.image, it.title, it.description)
+                    })
+                }
+            }
+            else -> {
+                Resource.Error("Ошибка сервера")
+            }
+        }
+    }
+
+    override fun getMovieDetails(movieId: String): Resource<MovieDetails> {
+        val response = networkClient.doRequest(MovieDetailsRequest(movieId))
+        return when (response.resultCode) {
+            -1, 500 -> {
+                Resource.Error("Проверьте подключение к интернету")
+            }
+            200 -> {
+                with(response as MovieDetailsResponse) {
+                    Resource.Success(
+                        MovieDetails(
+                            id = id ?: "", 
+                            title = title ?: "",
+                            imDbRating = imDbRating ?: "", 
+                            year = year ?: "",
+                            countries = countries ?: "",
+                            genres = genres ?: "",
+                            directors = directors ?: "",
+                            writers = writers ?: "",
+                            stars = stars ?: "",
+                            plot = plot ?: ""
+                        )
+                    )
+                }
+            }
+            else -> {
+                Resource.Error("Ошибка сервера")
+            }
         }
     }
 }
